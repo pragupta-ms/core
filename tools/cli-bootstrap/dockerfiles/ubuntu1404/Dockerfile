@@ -5,4 +5,3 @@ RUN apt-get -qqy install git
 RUN apt-get -qqy install python
 VOLUME /env/rover
 WORKDIR /env/rover
-ENTRYPOINT python rover.py
