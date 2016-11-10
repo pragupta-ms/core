@@ -19,8 +19,6 @@ public static class Program
     return quotes[new Random().Next(0, quotes.Length - 1)];
   }
 
-  
-
   public static void Bot(string message) 
   {   
     var _tempForeground = Console.ForegroundColor;
@@ -30,8 +28,8 @@ public static class Program
     Console.ForegroundColor = ConsoleColor.White;
     Console.WriteLine(@"
         __________________
-                              \
-                              \");
+                              \\
+                              \\");
     Console.ForegroundColor = ConsoleColor.Magenta;
     Console.WriteLine(@"
                                   ....
@@ -69,7 +67,8 @@ public static class Program
               .........                        ..............
                 .....");
       
+  
+  
+    Console.ForegroundColor = _tempForeground;
   }
-
-  Console.ForegroundColor = _tempForeground;
 }
