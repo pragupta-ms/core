@@ -10,7 +10,15 @@ from subprocess import check_call
 from subprocess import CalledProcessError
 from os import path
 
-def ShellCall(cmd, cwd = None):
+class ContinueOnError(Exception):
+    def __init__(self, working_directory, reprofile):
+        self.working_directory = working_directory
+        self.reprofile = reprofile
+        
+    def __str__(self):
+        return '%s - %s'%(working_directory, reprofile)
+
+def ShellCall(cmd, cwd = None, lenient=False):
     if not cwd:
         cwd = os.getcwd()
 
@@ -33,4 +41,8 @@ def ShellCall(cmd, cwd = None):
         print("a reproduction script was placed at : %s"%(repro_destination))
         print("To reproduce the failure:\n\tcd %s\n\t./%s"%(cwd, repro_filename))
 
+        # meh, lets just try to keep building everything.
+        if lenient:
+            raise ContinueOnError(cwd, repro_filename) # if we're feeling lenient, then we will raise up this opportunity to continue.
+        
         os._exit(1) # if we fail a check_call then we want to bail out asap so the dev can investigate.
