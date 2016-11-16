@@ -1,22 +1,17 @@
 #!/usr/bin/env python 
-
-# This shell script 'bakes' the docker containers that we depend on. Essentially, it sets up the docker containers in a certain manner where we
-# are enabled to run a test case within them.
-
-# to add a new platform to test on, simply create a directory (named anything that isn't already present) with a dockerfile in it. 
+import os
+import sys
 
 from shellcall import ShellCall
 from shellcall import ContinueOnError
-import sys
-
-from sys import argv
-from os import getcwd
-import os
-from os.path import join
-from os.path import exists
+from sys       import argv
+from os        import getcwd
+from os.path   import join
+from os.path   import exists
 
 # interface + data binding for managing the testcases.
 class Cases:
+    # TODO: use script directory instead of cwd, and require the containers directory to be local to the script
     _supported_containers = join(getcwd(), 'containers/') # our 'list' of current supported platforms are the directories in this directory
     _testcases = join(getcwd(), 'cases/')
     _continueOnError = True
@@ -45,7 +40,6 @@ class Cases:
         ShellCall('cp -R %s %s'%(join(self._testcases, casename), join(testing_destination, casename)), lenient = self._lenient)
         
         docker_run_cmd = 'docker run -v %s:/env/dotnet-bootstrap dotnet-bootstrap:%s'%(local_mount_location, str(container_name))
-        
         # ^ : This runs docker using the current container directory (with the Dockerfile) as the current working directory.
         # so that anything placed in that directory becomes accessible. 
         # eventually we will copy the tests in to this directory as well (see below)
@@ -54,10 +48,11 @@ class Cases:
         ShellCall('%s python /env/dotnet-bootstrap/dotnet.bootstrap.py -to /env/dotnet-bootstrap/'%(docker_run_cmd), lenient = self._lenient) # this will generate the src, obj, and bin directory here.
         
         # TODO: place into a ShellCall
-        # check if the test file exists (we just check that the e2e.csproj exists)
+                
+        # create whatever project file is the latest and greatest (was project.json, and is now named after the directory.csproj)
+        ShellCall('%s /env/dotnet-bootstrap/bin/dotnet new -t Console'%(self._docker_compose(container_name, local_mount_location, join("/env/dotnet-bootstrap/testing/", casename))), lenient= self._lenient)
+        # confirm that it exists.
         if exists(join(testing_destination, casename, casename + '.csproj')):
-            # create whatever project file is the latest and greatest (was project.json, and is now named after the directory.csproj)
-            ShellCall('%s /env/dotnet-bootstrap/bin/dotnet new -t Console'%(self._docker_compose(container_name, local_mount_location, join("/env/dotnet-bootstrap/testing/", casename))), lenient= self._lenient)
             ShellCall('cp -R %s/* %s'%(join(self._testcases, casename), join(testing_destination, casename)), lenient= self._lenient)
             ShellCall('%s /env/dotnet-bootstrap/bin/dotnet restore .'%(self._docker_compose(container_name, local_mount_location, join("/env/dotnet-bootstrap/testing/", casename))), lenient=self._lenient)
             ShellCall('%s /env/dotnet-bootstrap/bin/dotnet run'%(self._docker_compose(container_name, local_mount_location, join("/env/dotnet-bootstrap/testing/", casename))), lenient=self._lenient)
@@ -76,7 +71,7 @@ class Cases:
             break # just walk the top level.
 
     def List(self):
-        ShellCall('ls -1 %s'%(self._testcases), lenient = _lenient)
+        ShellCall('ls -1 %s'%(self._testcases), lenient = self._lenient)
 
     def __init__(self):
         if not exists(self._supported_containers):
