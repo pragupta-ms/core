@@ -5,6 +5,7 @@
 # build again.
 
 import os
+from subprocess import call
 from subprocess import check_call
 from subprocess import CalledProcessError
 from os import path

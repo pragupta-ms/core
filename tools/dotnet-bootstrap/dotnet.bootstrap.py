@@ -15,6 +15,7 @@ from subprocess import CalledProcessError
 
 from os import path
 from os import makedirs
+from os.path import normpath
 
 from string import find
 from urllib import urlretrieve
@@ -206,9 +207,9 @@ class RoverSettings:
     @staticmethod
     def SetWorkingDirectory(working_dir):
         RoverSettings._WorkingDirectory                   = working_dir
-        RoverSettings._srcDirectory                       = path.join(RoverSettings._WorkingDirectory, "src")
-        RoverSettings._objDirectory                       = path.join(RoverSettings._WorkingDirectory, "obj")
-        RoverSettings._binDirectory                       = path.join(RoverSettings._WorkingDirectory, "bin")
+        RoverSettings._srcDirectory                       = path.join(working_dir, "src")
+        RoverSettings._objDirectory                       = path.join(working_dir, "obj")
+        RoverSettings._binDirectory                       = path.join(working_dir, "bin")
 
 
     PayloadPath                         = str('')
@@ -468,7 +469,7 @@ if __name__ == "__main__":
         + '%s, %s, %s, %s'%(RoverMods.Red('coreclr'), RoverMods.Blue('corefx'), RoverMods.Green('core-setup'), RoverMods.Yellow('libuv') +'}'))
     parser.add_argument('-nopatch', action='store_true', default=False, help='prevents the copying of specific native binaries from the pre-built repositories in to the destination directory.')
     parser.add_argument('-payload', nargs=1, help='Specify a path to a tarball (something that we can tar xf) that contains a version of the dotnet CLI.')
-    parser.add_argument('-to', nargs=1, default='%s'%(RoverSettings._Moniker), help='allows you to overwrite the default staging directory (default is %s)'%(RoverSettings._Moniker))
+    parser.add_argument('-to', type=str, default='%s'%(RoverSettings._Moniker), help='allows you to overwrite the default staging directory (default is %s)'%(RoverSettings._Moniker))
 
     args = parser.parse_args()
 
@@ -478,7 +479,7 @@ if __name__ == "__main__":
     RoverPrint('Building: ' + RoverMods.White(str(args.build)))
     RoverPrint('Patching? ' + RoverMods.White(str(not args.nopatch)))
 
-    RoverSettings.SetWorkingDirectory(args.to)
+    RoverSettings.SetWorkingDirectory(normpath(str(args.to)))
 
     RoverPrint('Staging in %s'%(RoverSettings._WorkingDirectory))
     RoverSettings.BuildSet = args.build
@@ -532,10 +533,15 @@ if __name__ == "__main__":
         # Spawn our working directory
         if not path.exists(RoverSettings._WorkingDirectory):
             makedirs(RoverSettings._WorkingDirectory)
+
+        if not path.exists(RoverSettings._srcDirectory):
             makedirs(RoverSettings._srcDirectory)
+
+        if not path.exists(RoverSettings._objDirectory):
             makedirs(RoverSettings._objDirectory)
+
+        if not path.exists(RoverSettings._binDirectory):
             makedirs(RoverSettings._binDirectory)
-              
 
         SpawnPatchTarget(RoverSettings._binDirectory, RoverSettings.PayloadPath)
         

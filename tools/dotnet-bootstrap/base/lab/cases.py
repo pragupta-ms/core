@@ -10,31 +10,52 @@ import sys
 
 from sys import argv
 from os import getcwd
+import os
 from os.path import join
 from os.path import exists
 
 # interface + data binding for managing the testcases.
 class Cases:
-    _supported_containers = join(getcwd(), 'containers') + '/' # our 'list' of current supported platforms are the directories in this directory
-    _testcases = join(getcwd(), 'cases') + '/'
+    _supported_containers = join(getcwd(), 'containers/') # our 'list' of current supported platforms are the directories in this directory
+    _testcases = join(getcwd(), 'cases/')
 
-    # Runs a select case
-    def RunIn(self, container_name = None, casename = None):
-        ShellCall("echo \"running 'dotnet-bootstrap:%s'\""%(selected_case))
-        ShellCall("pushd %s"%(join(_testcases, selected_case)))
+    # if current_working_directory = None, then we use the working dir dictated by the dockerfile
+    # if none is specified in the dockerfile, then docker uses '/'
+    def _docker_compose(self, identifier, local_volume, current_working_directory = None):
+        wdir_parameter = None
         
-        # copy the bootstrap in to place.
-        ShellCall("cp ../../../dotnet.bootstrap.py .")
-
-        # this will mount our current directory as the working directory in the docker containers, then we run the bootstrap to produce a src, obj, and bin directory.
-        docker_run_cmd = 'docker run -v %s:/env/dotnet-bootstrap dotnet-bootstrap:%s'
-
-        ShellCall('%s python dotnet.bootstrap.py -to .'%(docker_run_cmd, getcwd(), container_name)) # this will generate the src, obj, and bin directory here.
-        ShellCall('%s ./bin/dotnet restore'%(docker_run_cmd))
-        ShellCall('%s ./bin/dotnet run'%(docker_run_cmd))
-
-        # copy test cases to this platform
-        ShellCall('popd')
+        if current_working_directory:
+            wdir_parameter = '-w "%s"'%(current_working_directory)
+            
+        return 'docker run %s -v %s:/env/dotnet-bootstrap dotnet-bootstrap:%s'%(wdir_parameter, local_volume, identifier)
+    
+    # Runs a select case
+    def RunIn(self, container_name, casename):
+        local_mount_location = join(self._supported_containers, container_name)
+        testing_destination = join(local_mount_location, "testing/")
+        
+        ShellCall("echo \"running 'dotnet-bootstrap:%s - testcase: %s'\""%(container_name, casename))
+        
+        # copy the bootstrap and test source in to the container working directory (next to the Dockerfile)
+        ShellCall('cp ../../dotnet.bootstrap.py %s'%(join(self._supported_containers, container_name)))
+        ShellCall('mkdir -p %s'%(join(testing_destination, casename)))
+        ShellCall('cp -R %s %s'%(join(self._testcases, casename), join(testing_destination, casename)))
+        
+        docker_run_cmd = 'docker run -v %s:/env/dotnet-bootstrap dotnet-bootstrap:%s'%(local_mount_location, str(container_name))
+        # ^ : This runs docker using the current container directory (with the Dockerfile) as the current working directory.
+        # so that anything placed in that directory becomes accessible. 
+        # eventually we will copy the tests in to this directory as well (see below)
+        
+        # run the bootstrap
+        ShellCall('%s python /env/dotnet-bootstrap/dotnet.bootstrap.py -to /env/dotnet-bootstrap/'%(docker_run_cmd)) # this will generate the src, obj, and bin directory here.
+        
+        # create whatever project file is the latest and greatest (was project.json, and is now named after the directory.csproj)
+        ShellCall('%s /env/dotnet-bootstrap/bin/dotnet new -t Console'%(self._docker_compose(container_name, local_mount_location, join("/env/dotnet-bootstrap/testing/", casename))))
+        
+        ShellCall('cp -R %s/* %s'%(join(self._testcases, casename), join(testing_destination, casename)))
+        
+        # ShellCall('%s /env/dotnet-bootstrap/bin/dotnet restore .'%(self._docker_compose(container_name, local_mount_location, join("/env/dotnet-bootstrap/testing/", casename))))
+        ShellCall('%s /env/dotnet-bootstrap/bin/dotnet run'%(self._docker_compose(container_name, local_mount_location, join("/env/dotnet-bootstrap/testing/", casename))))
 
     # runs the full matrix of tests
     def RunAll(self):
@@ -42,7 +63,7 @@ class Cases:
             for container in containers: # we keep it explicitly the case that there are no other directories in the cases or containers directories.
                 for root, cases, files in os.walk(self._testcases):
                     for case in cases:
-                        RunIn(container, case) # runs the full matrix of environments and cases
+                        self.RunIn(container, case) # runs the full matrix of environments and cases
                     
                     break # just walk the top level
             break # just walk the top level.

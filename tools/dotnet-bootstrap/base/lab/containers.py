@@ -17,16 +17,15 @@ from os import getcwd
 class Containers:
     _supported_platforms = join(getcwd(), 'containers') + '/' # our 'list' of current supported platforms are the directories in this directory
 
-    def Bake(self, selected_platform = None):
-        ShellCall("echo baking 'cli-bootstrap:%s'"%(selected_platform))
-        ShellCall("pushd %s"%(selected_platform))
-        ShellCall("docker build -t \"cli-bootstrap:${%s}\" ."%(selected_platform))
-        ShellCall("popd")
+    def Bake(self, selected_platform):
+        ShellCall("echo baking 'dotnet-bootstrap:%s'"%(selected_platform))
+        ShellCall("docker build -t \"dotnet-bootstrap:%s\" ."%(selected_platform), join(self._supported_platforms, selected_platform))
 
     def BakeAll(self):
         for root, platforms, files in os.walk(self._supported_platforms):
             for platform in platforms: # we keep it explicitly the case that there are no other directories in the cases or containers directories.
-                Bake(platform)
+                self.Bake(platform)
+            break
 
     def List(self):
         ShellCall('ls -1 %s'%(self._supported_platforms))
@@ -39,7 +38,7 @@ if __name__ == '__main__':
     containers = Containers()
 
     dictionary = { 
-        "bake": containers.Bake,
+        "bake": containers.BakeAll,
         "list": containers.List
     }
 
